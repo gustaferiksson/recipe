@@ -1,8 +1,8 @@
 import type { RecipeDetail } from "@recipe/recipe-core"
 import { Check, ChevronLeft, Loader2 } from "lucide-react"
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Link, type LoaderFunctionArgs, useLoaderData, useNavigate, useParams } from "react-router-dom"
-import { commitVersion, editPreview, getRecipe } from "../api"
+import { type ConversationMessage, type EditAgentEvent, agentEditPreview, commitVersion, getRecipe } from "../api"
 
 export async function loader({ params }: LoaderFunctionArgs) {
     return getRecipe(params.id ?? "")
@@ -73,25 +73,58 @@ export function EditPage() {
     const [error, setError] = useState("")
     const [activeTab, setActiveTab] = useState<"original" | "edited">("edited")
 
+    const [messages, setMessages] = useState<ConversationMessage[]>([])
+    const [progressHints, setProgressHints] = useState<string[]>([])
+    const [awaitingClarification, setAwaitingClarification] = useState(false)
+
+    const cancelRef = useRef<(() => void) | null>(null)
+    const threadRef = useRef<HTMLDivElement>(null)
+
     const diffBase = proposed ?? current
+
+    // Scroll chat thread to bottom when messages or hints change
+    useEffect(() => {
+        threadRef.current?.scrollTo({ top: threadRef.current.scrollHeight, behavior: "smooth" })
+    }, [messages, progressHints])
+
+    function handleEvent(event: EditAgentEvent) {
+        if (event.type === "progress") {
+            setProgressHints((prev) => [...prev, event.label])
+        } else if (event.type === "clarification") {
+            setMessages((prev) => [...prev, { role: "assistant", content: event.question }])
+            setAwaitingClarification(true)
+            setProgressHints([])
+            setGenerating(false)
+        } else if (event.type === "result") {
+            setProposed(event.recipe)
+            setActiveTab("edited")
+            setProgressHints([])
+            setGenerating(false)
+        } else if (event.type === "error") {
+            setError(event.message)
+            setProgressHints([])
+            setGenerating(false)
+        }
+    }
 
     async function handleGenerate() {
         if (!prompt.trim() || !diffBase || !id) return
 
         const trimmedPrompt = prompt.trim()
+        const nextMessages: ConversationMessage[] = [...messages, { role: "user", content: trimmedPrompt }]
+
+        setMessages(nextMessages)
+        setPrompt("")
         setGenerating(true)
         setError("")
-        try {
-            const result = await editPreview(id, trimmedPrompt, diffBase)
-            setProposed(result)
-            setUsedPrompt(trimmedPrompt)
-            setActiveTab("edited")
-            setPrompt("")
-        } catch (err) {
-            setError(err instanceof Error ? err.message : "Something went wrong")
-        } finally {
-            setGenerating(false)
-        }
+        setProgressHints([])
+        setAwaitingClarification(false)
+
+        if (!usedPrompt) setUsedPrompt(trimmedPrompt)
+
+        // History = all messages before the current prompt
+        const history = messages
+        cancelRef.current = agentEditPreview(id, history, trimmedPrompt, diffBase, handleEvent)
     }
 
     async function handleAccept() {
@@ -113,6 +146,8 @@ export function EditPage() {
             </div>
         )
     }
+
+    const hasThread = messages.length > 0 || progressHints.length > 0
 
     return (
         <div className="min-h-dvh flex flex-col max-w-lg mx-auto">
@@ -161,8 +196,42 @@ export function EditPage() {
             </div>
 
             {/* Prompt bar */}
-            <div className="sticky bottom-0 bg-base-100/90 backdrop-blur border-t border-base-300 px-4 py-4 space-y-2">
+            <div className="sticky bottom-0 bg-base-100/90 backdrop-blur border-t border-base-300 px-4 py-4 space-y-3">
+                {/* Chat thread */}
+                {hasThread && (
+                    <div ref={threadRef} className="space-y-2 max-h-40 overflow-y-auto">
+                        {messages.map((msg, i) => (
+                            // biome-ignore lint/suspicious/noArrayIndexKey: message order is stable
+                            <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                                <div
+                                    className={`text-xs px-3 py-1.5 rounded-2xl max-w-[85%] ${
+                                        msg.role === "user"
+                                            ? "bg-primary text-primary-content"
+                                            : "bg-base-300 text-base-content"
+                                    }`}
+                                >
+                                    {msg.content}
+                                </div>
+                            </div>
+                        ))}
+                        {progressHints.length > 0 && (
+                            <div className="flex justify-start">
+                                <div className="text-xs px-3 py-1.5 rounded-2xl bg-base-300 text-base-content space-y-0.5">
+                                    {progressHints.map((hint, i) => (
+                                        // biome-ignore lint/suspicious/noArrayIndexKey: hints are append-only
+                                        <div key={i} className="flex items-center gap-1.5 opacity-70">
+                                            <Loader2 className="w-3 h-3 animate-spin shrink-0" />
+                                            {hint}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {error && <p className="text-error text-xs">{error}</p>}
+
                 <form
                     onSubmit={(e) => {
                         e.preventDefault()
@@ -172,9 +241,11 @@ export function EditPage() {
                 >
                     <textarea
                         placeholder={
-                            proposed
-                                ? "Refine further… (e.g. also scale to 4 servings)"
-                                : "Describe your change… (e.g. make it vegetarian)"
+                            awaitingClarification
+                                ? "Reply to clarification…"
+                                : proposed
+                                  ? "Refine further… (e.g. also scale to 4 servings)"
+                                  : "Describe your change… (e.g. add chicken breast)"
                         }
                         value={prompt}
                         onChange={(e) => setPrompt(e.target.value)}

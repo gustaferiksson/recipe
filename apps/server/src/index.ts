@@ -11,7 +11,7 @@ import type {
     RecipeVersionRow,
 } from "@recipe/recipe-core"
 import { RecipeSchema } from "@recipe/recipe-core"
-import { editRecipe, generateVersionName, parseRecipeFromMarkdown } from "./agent"
+import { type ConversationMessage, type EditAgentEvent, agentEditRecipe, generateVersionName, parseRecipeFromMarkdown } from "./agent"
 import { db, IMAGES_DIR } from "./db"
 import { printRecipe } from "./printer"
 import { downloadImage, scrapeUrl } from "./scraper"
@@ -240,6 +240,7 @@ async function handleEditPreview(req: Request): Promise<Response> {
     const body = (await req.json()) as {
         prompt?: string
         currentRecipe?: Recipe
+        history?: ConversationMessage[]
     }
 
     if (!body.prompt) return error("prompt is required")
@@ -249,8 +250,31 @@ async function handleEditPreview(req: Request): Promise<Response> {
     if (!parsed.success) return error("currentRecipe is invalid")
 
     const tags = loadTags()
-    const proposed = await editRecipe(parsed.data, body.prompt, tags)
-    return cors(json(proposed))
+    const history = body.history ?? []
+
+    const stream = new ReadableStream({
+        async start(controller) {
+            function send(event: EditAgentEvent) {
+                controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(event)}\n\n`))
+            }
+            try {
+                await agentEditRecipe(parsed.data, history, body.prompt!, tags, send)
+            } finally {
+                controller.close()
+            }
+        },
+    })
+
+    return cors(
+        new Response(stream, {
+            headers: {
+                "Content-Type": "text/event-stream",
+                "Cache-Control": "no-cache",
+                Connection: "keep-alive",
+                "Access-Control-Allow-Origin": "*",
+            },
+        })
+    )
 }
 
 async function handleCommitVersion(req: Request, recipeId: string): Promise<Response> {

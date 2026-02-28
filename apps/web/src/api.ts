@@ -6,6 +6,14 @@ export type ImportEvent =
     | { status: "done"; recipeId: string }
     | { status: "error"; message: string }
 
+export type EditAgentEvent =
+    | { type: "progress"; label: string }
+    | { type: "clarification"; question: string }
+    | { type: "result"; recipe: Recipe }
+    | { type: "error"; message: string }
+
+export type ConversationMessage = { role: "user" | "assistant"; content: string }
+
 export function importRecipe(url: string, onEvent: (event: ImportEvent) => void): () => void {
     const controller = new AbortController()
 
@@ -58,17 +66,62 @@ export async function getRecipe(id: string): Promise<RecipeDetail> {
     return res.json()
 }
 
-export async function editPreview(recipeId: string, prompt: string, currentRecipe: Recipe): Promise<Recipe> {
-    const res = await fetch(`/api/recipes/${recipeId}/edit-preview`, {
+export function agentEditPreview(
+    recipeId: string,
+    history: ConversationMessage[],
+    prompt: string,
+    currentRecipe: Recipe,
+    onEvent: (event: EditAgentEvent) => void
+): () => void {
+    const controller = new AbortController()
+
+    void fetch(`/api/recipes/${recipeId}/edit-preview`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, currentRecipe }),
+        body: JSON.stringify({ prompt, currentRecipe, history }),
+        signal: controller.signal,
     })
-    if (!res.ok) {
-        const { error } = await res.json()
-        throw new Error(error ?? "Edit preview failed")
-    }
-    return res.json()
+        .then(async (res) => {
+            if (!res.ok) {
+                const data = await res.json()
+                onEvent({ type: "error", message: data.error ?? "Edit preview failed" })
+                return
+            }
+
+            const reader = res.body?.getReader()
+            if (!reader) return
+
+            const decoder = new TextDecoder()
+            let buffer = ""
+
+            while (true) {
+                const { done, value } = await reader.read()
+                if (done) break
+
+                buffer += decoder.decode(value, { stream: true })
+                const parts = buffer.split("\n\n")
+                buffer = parts.pop() ?? ""
+
+                for (const part of parts) {
+                    const line = part.trim()
+                    if (line.startsWith("data: ")) {
+                        try {
+                            const event = JSON.parse(line.slice(6)) as EditAgentEvent
+                            onEvent(event)
+                        } catch {
+                            // ignore malformed SSE lines
+                        }
+                    }
+                }
+            }
+        })
+        .catch((err) => {
+            if (err instanceof Error && err.name !== "AbortError") {
+                onEvent({ type: "error", message: err.message })
+            }
+        })
+
+    return () => controller.abort()
 }
 
 export async function commitVersion(
