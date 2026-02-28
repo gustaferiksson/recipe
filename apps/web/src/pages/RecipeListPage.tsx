@@ -1,5 +1,5 @@
 import type { RecipeListItem } from "@recipe/recipe-core"
-import { ChevronLeft, Trash2 } from "lucide-react"
+import { ChevronLeft, Settings, Trash2 } from "lucide-react"
 import { useState } from "react"
 import { Link, useLoaderData, useNavigate } from "react-router-dom"
 import { deleteRecipe, listRecipes } from "../api"
@@ -26,7 +26,10 @@ export function RecipeListPage() {
                 <Link to="/" className="btn btn-ghost btn-square">
                     <ChevronLeft className="w-5 h-5" />
                 </Link>
-                <h1 className="text-xl font-bold">My Recipes</h1>
+                <h1 className="text-xl font-bold flex-1">My Recipes</h1>
+                <Link to="/settings" className="btn btn-ghost btn-square" aria-label="Settings">
+                    <Settings className="w-4 h-4" />
+                </Link>
             </div>
 
             {recipes.length === 0 && (

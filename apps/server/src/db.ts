@@ -27,11 +27,21 @@ db.run(`
 
 db.run(`
   CREATE TABLE IF NOT EXISTS recipe_versions (
-    id           TEXT PRIMARY KEY,
-    recipe_id    TEXT NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
-    recipe_json  TEXT NOT NULL,
-    edit_prompt  TEXT,
-    created_at   TEXT NOT NULL
+    id          TEXT PRIMARY KEY,
+    recipe_id   TEXT NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
+    recipe_json TEXT NOT NULL,
+    edit_prompt TEXT,
+    name        TEXT,
+    changeset   TEXT,
+    created_at  TEXT NOT NULL
+  )
+`)
+
+db.run(`
+  CREATE TABLE IF NOT EXISTS tags (
+    id         TEXT PRIMARY KEY,
+    name       TEXT UNIQUE NOT NULL,
+    created_at TEXT NOT NULL
   )
 `)
 

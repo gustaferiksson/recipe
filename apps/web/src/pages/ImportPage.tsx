@@ -1,4 +1,4 @@
-import { Loader2 } from "lucide-react"
+import { Loader2, Settings } from "lucide-react"
 import { useRef, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { type ImportEvent, importRecipe } from "../api"
@@ -45,9 +45,14 @@ export function ImportPage() {
                     <span className="text-2xl">🍳</span>
                     <h1 className="text-2xl font-bold text-primary">Recipes</h1>
                 </div>
-                <Link to="/recipes" className="link link-hover text-sm">
-                    My Recipes →
-                </Link>
+                <div className="flex items-center gap-3">
+                    <Link to="/recipes" className="link link-hover text-sm">
+                        My Recipes →
+                    </Link>
+                    <Link to="/settings" className="btn btn-ghost btn-square btn-sm" aria-label="Settings">
+                        <Settings className="w-4 h-4" />
+                    </Link>
+                </div>
             </div>
 
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">

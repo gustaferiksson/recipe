@@ -3,6 +3,8 @@ import tailwindcss from "@tailwindcss/vite"
 import react from "@vitejs/plugin-react"
 import { defineConfig } from "vite"
 
+const serverPort = process.env.SERVER_PORT ?? "3001"
+
 export default defineConfig({
     plugins: [react(), tailwindcss()],
     resolve: {
@@ -11,10 +13,9 @@ export default defineConfig({
         },
     },
     server: {
-        port: 5173,
         proxy: {
-            "/api": "http://localhost:3001",
-            "/images": "http://localhost:3001",
+            "/api": `http://localhost:${serverPort}`,
+            "/images": `http://localhost:${serverPort}`,
         },
     },
 })

@@ -5,6 +5,7 @@ import { EditPage, loader as editLoader } from "./pages/EditPage"
 import { ImportPage } from "./pages/ImportPage"
 import { loader as detailLoader, RecipeDetailPage } from "./pages/RecipeDetailPage"
 import { RecipeListPage, loader as recipesLoader } from "./pages/RecipeListPage"
+import { SettingsPage, loader as settingsLoader } from "./pages/SettingsPage"
 import "./index.css"
 
 const router = createBrowserRouter([
@@ -26,6 +27,11 @@ const router = createBrowserRouter([
         path: "/recipes/:id/edit",
         loader: editLoader,
         element: <EditPage />,
+    },
+    {
+        path: "/settings",
+        loader: settingsLoader,
+        element: <SettingsPage />,
     },
     {
         path: "*",

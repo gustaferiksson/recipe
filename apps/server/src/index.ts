@@ -1,9 +1,17 @@
 import crypto from "node:crypto"
 import fs from "node:fs"
 import path from "node:path"
-import type { Recipe, RecipeDetail, RecipeListItem, RecipeRow, RecipeVersionRow } from "@recipe/recipe-core"
+import type {
+    Ingredient,
+    IngredientDiff,
+    Recipe,
+    RecipeDetail,
+    RecipeListItem,
+    RecipeRow,
+    RecipeVersionRow,
+} from "@recipe/recipe-core"
 import { RecipeSchema } from "@recipe/recipe-core"
-import { editRecipe, parseRecipeFromMarkdown } from "./agent"
+import { editRecipe, generateVersionName, parseRecipeFromMarkdown } from "./agent"
 import { db, IMAGES_DIR } from "./db"
 import { printRecipe } from "./printer"
 import { downloadImage, scrapeUrl } from "./scraper"
@@ -36,6 +44,36 @@ function cors(res: Response): Response {
     return res
 }
 
+function loadTags(): string[] {
+    return db
+        .query<{ name: string }, []>("SELECT name FROM tags")
+        .all()
+        .map((r) => r.name)
+}
+
+function computeChangeset(original: Ingredient[], edited: Ingredient[]): IngredientDiff[] {
+    const diffs: IngredientDiff[] = []
+    const originalMap = new Map(original.map((ing) => [ing.name.toLowerCase(), ing]))
+    const editedMap = new Map(edited.map((ing) => [ing.name.toLowerCase(), ing]))
+
+    for (const [name, orig] of originalMap) {
+        const ed = editedMap.get(name)
+        if (!ed) {
+            diffs.push({ type: "removed", ingredient: orig })
+        } else if (JSON.stringify(orig) !== JSON.stringify(ed)) {
+            diffs.push({ type: "modified", before: orig, after: ed })
+        }
+    }
+
+    for (const [name, ed] of editedMap) {
+        if (!originalMap.has(name)) {
+            diffs.push({ type: "added", ingredient: ed })
+        }
+    }
+
+    return diffs
+}
+
 // ─── Route handlers ──────────────────────────────────────────────────────────
 
 async function handleImport(req: Request): Promise<Response> {
@@ -45,6 +83,7 @@ async function handleImport(req: Request): Promise<Response> {
 
     const recipeId = newId()
     const createdAt = now()
+    const tags = loadTags()
 
     const stream = new ReadableStream({
         async start(controller) {
@@ -79,7 +118,7 @@ async function handleImport(req: Request): Promise<Response> {
                 }
 
                 send({ status: "parsing" })
-                const recipe = await parseRecipeFromMarkdown(markdown, url, createdAt)
+                const recipe = await parseRecipeFromMarkdown(markdown, url, createdAt, tags)
 
                 const versionId = newId()
                 db.transaction(() => {
@@ -89,8 +128,8 @@ async function handleImport(req: Request): Promise<Response> {
                         [recipeId, url, createdAt, JSON.stringify(recipe), imagePath, createdAt]
                     )
                     db.run(
-                        `INSERT INTO recipe_versions (id, recipe_id, recipe_json, edit_prompt, created_at)
-                 VALUES (?, ?, ?, NULL, ?)`,
+                        `INSERT INTO recipe_versions (id, recipe_id, recipe_json, edit_prompt, name, changeset, created_at)
+                 VALUES (?, ?, ?, NULL, NULL, NULL, ?)`,
                         [versionId, recipeId, JSON.stringify(recipe), createdAt]
                     )
                     db.run(`UPDATE recipes SET default_version_id = ? WHERE id = ?`, [versionId, recipeId])
@@ -172,7 +211,9 @@ function handleGetRecipe(id: string): Response {
     if (!recipe) return cors(error("Recipe not found", 404))
 
     const versions = db
-        .query<RecipeVersionRow, [string]>(`SELECT * FROM recipe_versions WHERE recipe_id = ? ORDER BY created_at ASC`)
+        .query<RecipeVersionRow, [string]>(
+            `SELECT * FROM recipe_versions WHERE recipe_id = ? ORDER BY created_at DESC`
+        )
         .all(id)
 
     const detail: RecipeDetail = {
@@ -186,6 +227,8 @@ function handleGetRecipe(id: string): Response {
             id: v.id,
             recipe: JSON.parse(v.recipe_json),
             editPrompt: v.edit_prompt,
+            name: v.name,
+            changeset: v.changeset ? (JSON.parse(v.changeset) as IngredientDiff[]) : null,
             createdAt: v.created_at,
         })),
     }
@@ -205,7 +248,8 @@ async function handleEditPreview(req: Request): Promise<Response> {
     const parsed = RecipeSchema.safeParse(body.currentRecipe)
     if (!parsed.success) return error("currentRecipe is invalid")
 
-    const proposed = await editRecipe(parsed.data, body.prompt)
+    const tags = loadTags()
+    const proposed = await editRecipe(parsed.data, body.prompt, tags)
     return cors(json(proposed))
 }
 
@@ -216,6 +260,7 @@ async function handleCommitVersion(req: Request, recipeId: string): Promise<Resp
     const body = (await req.json()) as {
         recipe?: Recipe
         editPrompt?: string
+        originalRecipe?: Recipe
     }
     if (!body.recipe) return error("recipe is required")
 
@@ -225,10 +270,34 @@ async function handleCommitVersion(req: Request, recipeId: string): Promise<Resp
     const versionId = newId()
     const createdAt = now()
 
+    // Compute changeset if originalRecipe is provided
+    let changeset: IngredientDiff[] | null = null
+    if (body.originalRecipe) {
+        changeset = computeChangeset(body.originalRecipe.ingredients, parsed.data.ingredients)
+    }
+
+    // Generate version name if editPrompt and originalRecipe are provided
+    let versionName: string | null = null
+    if (body.editPrompt && body.originalRecipe) {
+        try {
+            versionName = await generateVersionName(body.editPrompt, body.originalRecipe, parsed.data)
+        } catch {
+            // Non-fatal: fall back to null name
+        }
+    }
+
     db.run(
-        `INSERT INTO recipe_versions (id, recipe_id, recipe_json, edit_prompt, created_at)
-     VALUES (?, ?, ?, ?, ?)`,
-        [versionId, recipeId, JSON.stringify(parsed.data), body.editPrompt ?? null, createdAt]
+        `INSERT INTO recipe_versions (id, recipe_id, recipe_json, edit_prompt, name, changeset, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+            versionId,
+            recipeId,
+            JSON.stringify(parsed.data),
+            body.editPrompt ?? null,
+            versionName,
+            changeset ? JSON.stringify(changeset) : null,
+            createdAt,
+        ]
     )
     db.run(`UPDATE recipes SET default_version_id = ? WHERE id = ?`, [versionId, recipeId])
 
@@ -279,6 +348,37 @@ function handleDeleteRecipe(id: string): Response {
     return cors(json({ ok: true }))
 }
 
+// ─── Tag handlers ─────────────────────────────────────────────────────────────
+
+function handleGetTags(): Response {
+    const rows = db
+        .query<{ id: string; name: string }, []>(`SELECT id, name FROM tags ORDER BY name ASC`)
+        .all()
+    return cors(json(rows))
+}
+
+async function handleCreateTag(req: Request): Promise<Response> {
+    const body = (await req.json()) as { name?: string }
+    if (!body.name?.trim()) return error("name is required")
+
+    const id = newId()
+    const createdAt = now()
+    try {
+        db.run(`INSERT INTO tags (id, name, created_at) VALUES (?, ?, ?)`, [id, body.name.trim(), createdAt])
+    } catch {
+        return error("Tag already exists", 409)
+    }
+    return cors(json({ id, name: body.name.trim() }, 201))
+}
+
+function handleDeleteTag(tagId: string): Response {
+    const exists = db.query<{ id: string }, [string]>(`SELECT id FROM tags WHERE id = ?`).get(tagId)
+    if (!exists) return cors(error("Tag not found", 404))
+
+    db.run(`DELETE FROM tags WHERE id = ?`, [tagId])
+    return cors(json({ ok: true }))
+}
+
 // ─── Router ──────────────────────────────────────────────────────────────────
 
 Bun.serve({
@@ -309,6 +409,22 @@ Bun.serve({
         // GET /api/recipes
         if (method === "GET" && pathname === "/api/recipes") {
             return handleListRecipes()
+        }
+
+        // GET /api/tags
+        if (method === "GET" && pathname === "/api/tags") {
+            return handleGetTags()
+        }
+
+        // POST /api/tags
+        if (method === "POST" && pathname === "/api/tags") {
+            return handleCreateTag(req)
+        }
+
+        // DELETE /api/tags/:tagId
+        const tagMatch = pathname.match(/^\/api\/tags\/([^/]+)$/)
+        if (tagMatch && method === "DELETE") {
+            return handleDeleteTag(tagMatch[1])
         }
 
         // GET /api/recipes/:id

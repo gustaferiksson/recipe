@@ -1,5 +1,5 @@
-import type { RecipeDetail } from "@recipe/recipe-core"
-import { Check, ChevronLeft, Pencil, Printer, Star } from "lucide-react"
+import type { IngredientDiff, RecipeDetail } from "@recipe/recipe-core"
+import { Check, ChevronLeft, Eye, Pencil, Printer, Star } from "lucide-react"
 import { useState } from "react"
 import { Link, type LoaderFunctionArgs, useLoaderData, useNavigate, useParams } from "react-router-dom"
 import { getRecipe, printRecipe, setDefault } from "../api"
@@ -8,15 +8,53 @@ export async function loader({ params }: LoaderFunctionArgs) {
     return getRecipe(params.id ?? "")
 }
 
+function formatIngredientShort(ing: { quantity?: number | null; unit?: string | null; name: string }): string {
+    return [ing.quantity != null ? String(ing.quantity) : null, ing.unit, ing.name].filter(Boolean).join(" ")
+}
+
+function ChangesetDisplay({ changeset }: { changeset: IngredientDiff[] }) {
+    if (changeset.length === 0) return null
+    return (
+        <ul className="mt-1.5 space-y-0.5 text-xs opacity-70">
+            {changeset.map((diff, i) => {
+                if (diff.type === "added") {
+                    return (
+                        // biome-ignore lint/suspicious/noArrayIndexKey: diffs have no stable id
+                        <li key={i} className="text-success">
+                            ➕ {diff.ingredient.name}
+                        </li>
+                    )
+                }
+                if (diff.type === "removed") {
+                    return (
+                        // biome-ignore lint/suspicious/noArrayIndexKey: diffs have no stable id
+                        <li key={i} className="text-error">
+                            ➖ {diff.ingredient.name}
+                        </li>
+                    )
+                }
+                return (
+                    // biome-ignore lint/suspicious/noArrayIndexKey: diffs have no stable id
+                    <li key={i} className="text-warning">
+                        ✏️ {diff.before.name}: {formatIngredientShort(diff.before)} → {formatIngredientShort(diff.after)}
+                    </li>
+                )
+            })}
+        </ul>
+    )
+}
+
 export function RecipeDetailPage() {
     const { id } = useParams<{ id: string }>()
     const navigate = useNavigate()
     const loaded = useLoaderData() as Awaited<ReturnType<typeof loader>>
     const [detail, setDetail] = useState<RecipeDetail>(loaded)
+    const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null)
     const [printing, setPrinting] = useState(false)
     const [printMsg, setPrintMsg] = useState<{ type: "success" | "error"; text: string } | null>(null)
 
-    const activeVersion = detail.versions.find((v) => v.id === detail.defaultVersionId) ?? detail.versions.at(-1)
+    const viewingId = selectedVersionId ?? detail.defaultVersionId
+    const activeVersion = detail.versions.find((v) => v.id === viewingId) ?? detail.versions[0]
     const recipe = activeVersion?.recipe
 
     async function handleSetDefault(versionId: string) {
@@ -79,9 +117,9 @@ export function RecipeDetailPage() {
 
             {/* Hero image */}
             {imageSrc ? (
-                <img src={imageSrc} alt={recipe.title} className="w-full aspect-video object-cover" />
+                <img src={imageSrc} alt={recipe.title} className="w-full aspect-video object-cover rounded-lg" />
             ) : (
-                <div className="w-full aspect-video bg-base-200 flex items-center justify-center">
+                <div className="w-full aspect-video bg-base-200 flex items-center justify-center rounded-lg">
                     <span className="text-6xl opacity-30">🍳</span>
                 </div>
             )}
@@ -148,31 +186,54 @@ export function RecipeDetailPage() {
                         <ul className="space-y-2">
                             {detail.versions.map((v) => {
                                 const isDefault = v.id === detail.defaultVersionId
+                                const isViewing = v.id === viewingId
+                                const isViewingNonDefault = isViewing && !isDefault
+                                const label = v.name ?? v.editPrompt ?? "Original"
                                 return (
                                     <li
                                         key={v.id}
-                                        className={`flex items-center gap-3 p-3 rounded-box border text-sm transition-colors ${
-                                            isDefault ? "border-primary/40 bg-primary/5" : "border-base-300"
+                                        className={`p-3 rounded-box border text-sm transition-colors cursor-pointer ${
+                                            isDefault
+                                                ? "border-primary/40 bg-primary/5"
+                                                : isViewing
+                                                  ? "border-base-300 bg-base-200"
+                                                  : "border-base-300 hover:border-primary/20"
                                         }`}
+                                        onClick={() => setSelectedVersionId(v.id)}
                                     >
-                                        <div className="flex-1 min-w-0">
-                                            <p className="font-medium truncate">{v.editPrompt ?? "Original"}</p>
-                                            <p className="text-xs opacity-50 mt-0.5">
-                                                {new Date(v.createdAt).toLocaleDateString()}
-                                            </p>
+                                        <div className="flex items-center gap-3">
+                                            <div className="flex-1 min-w-0">
+                                                <p className="font-medium truncate">{label}</p>
+                                                <p className="text-xs opacity-50 mt-0.5">
+                                                    {new Date(v.createdAt).toLocaleDateString()}
+                                                </p>
+                                            </div>
+                                            <div className="flex items-center gap-2 shrink-0">
+                                                {isViewingNonDefault && (
+                                                    <span className="flex items-center gap-1 text-xs opacity-60">
+                                                        <Eye className="w-3 h-3" /> Viewing
+                                                    </span>
+                                                )}
+                                                {isDefault ? (
+                                                    <span className="flex items-center gap-1 text-xs text-primary font-medium">
+                                                        <Star className="w-3 h-3" /> Default
+                                                    </span>
+                                                ) : (
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-ghost btn-xs opacity-60"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            void handleSetDefault(v.id)
+                                                        }}
+                                                    >
+                                                        Set default
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
-                                        {isDefault ? (
-                                            <span className="flex items-center gap-1 text-xs text-primary font-medium">
-                                                <Star className="w-3 h-3" /> Default
-                                            </span>
-                                        ) : (
-                                            <button
-                                                type="button"
-                                                className="btn btn-ghost btn-xs opacity-60"
-                                                onClick={() => void handleSetDefault(v.id)}
-                                            >
-                                                Set default
-                                            </button>
+                                        {v.changeset && v.changeset.length > 0 && (
+                                            <ChangesetDisplay changeset={v.changeset} />
                                         )}
                                     </li>
                                 )
