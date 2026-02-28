@@ -56,6 +56,12 @@
       "indentWidth": 2
     }
   },
+  "overrides": [
+    {
+      "includes": ["**/index.css"],
+      "linter": { "enabled": false }
+    }
+  ],
   "javascript": {
     "formatter": {
       "semicolons": "asNeeded",

@@ -93,6 +93,7 @@ export function agentEditPreview(
 
             const decoder = new TextDecoder()
             let buffer = ""
+            let gotResult = false
 
             while (true) {
                 const { done, value } = await reader.read()
@@ -107,12 +108,17 @@ export function agentEditPreview(
                     if (line.startsWith("data: ")) {
                         try {
                             const event = JSON.parse(line.slice(6)) as EditAgentEvent
+                            if (event.type === "result") gotResult = true
                             onEvent(event)
                         } catch {
                             // ignore malformed SSE lines
                         }
                     }
                 }
+            }
+
+            if (!gotResult) {
+                onEvent({ type: "error", message: "Connection closed before edit completed. Try again." })
             }
         })
         .catch((err) => {

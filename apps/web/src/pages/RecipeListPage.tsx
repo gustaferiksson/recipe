@@ -44,32 +44,35 @@ export function RecipeListPage() {
 
             <ul className="flex flex-col gap-3">
                 {recipes.map((r) => (
-                    <li key={r.id} className="card card-border bg-base-100 hover:border-primary/40 transition-colors">
-                        <div className="flex items-center">
+                    <li
+                        key={r.id}
+                        className="card card-side card-border bg-base-100 hover:border-primary/40 transition-colors"
+                    >
+                        <figure className="w-20 shrink-0">
+                            {r.imagePath ? (
+                                <img
+                                    className="w-full h-full object-cover"
+                                    src={`/images/${r.imagePath}`}
+                                    alt={r.title}
+                                />
+                            ) : (
+                                <div className="w-full h-full bg-base-200 flex items-center justify-center">
+                                    <span className="text-2xl">🍳</span>
+                                </div>
+                            )}
+                        </figure>
+                        <div className="card-body p-0 flex-row items-center min-w-0">
                             <button
                                 type="button"
-                                className="flex items-center gap-3 flex-1 min-w-0 p-4 text-left active:scale-[0.99]"
+                                className="flex-1 min-w-0 p-4 text-left cursor-pointer active:scale-[0.99]"
                                 onClick={() => void navigate(`/recipes/${r.id}`)}
                             >
-                                {r.imagePath ? (
-                                    <img
-                                        className="w-14 h-14 rounded-lg object-cover shrink-0"
-                                        src={`/images/${r.imagePath}`}
-                                        alt={r.title}
-                                    />
-                                ) : (
-                                    <div className="w-14 h-14 rounded-lg bg-base-200 flex items-center justify-center shrink-0">
-                                        <span className="text-2xl">🍳</span>
-                                    </div>
-                                )}
-                                <div className="flex-1 min-w-0">
-                                    <p className="font-semibold truncate">{r.title}</p>
-                                    <div className="flex gap-2 mt-1 flex-wrap items-center">
-                                        {r.cuisine && <span className="badge badge-neutral text-xs">{r.cuisine}</span>}
-                                        <span className="text-xs opacity-60">
-                                            {r.versionCount} version{r.versionCount !== 1 ? "s" : ""}
-                                        </span>
-                                    </div>
+                                <p className="font-semibold truncate">{r.title}</p>
+                                <div className="flex gap-2 mt-1 flex-wrap items-center">
+                                    {r.cuisine && <span className="badge badge-neutral text-xs">{r.cuisine}</span>}
+                                    <span className="text-xs opacity-60">
+                                        {r.versionCount} version{r.versionCount !== 1 ? "s" : ""}
+                                    </span>
                                 </div>
                             </button>
                             <button

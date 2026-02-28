@@ -21,6 +21,7 @@ const router = createBrowserRouter([
     {
         path: "/recipes/:id",
         loader: detailLoader,
+        shouldRevalidate: ({ currentUrl, nextUrl }) => currentUrl.pathname !== nextUrl.pathname,
         element: <RecipeDetailPage />,
     },
     {

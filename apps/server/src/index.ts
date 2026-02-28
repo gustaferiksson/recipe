@@ -11,7 +11,13 @@ import type {
     RecipeVersionRow,
 } from "@recipe/recipe-core"
 import { RecipeSchema } from "@recipe/recipe-core"
-import { type ConversationMessage, type EditAgentEvent, agentEditRecipe, generateVersionName, parseRecipeFromMarkdown } from "./agent"
+import {
+    agentEditRecipe,
+    type ConversationMessage,
+    type EditAgentEvent,
+    generateVersionName,
+    parseRecipeFromMarkdown,
+} from "./agent"
 import { db, IMAGES_DIR } from "./db"
 import { printRecipe } from "./printer"
 import { downloadImage, scrapeUrl } from "./scraper"
@@ -211,9 +217,7 @@ function handleGetRecipe(id: string): Response {
     if (!recipe) return cors(error("Recipe not found", 404))
 
     const versions = db
-        .query<RecipeVersionRow, [string]>(
-            `SELECT * FROM recipe_versions WHERE recipe_id = ? ORDER BY created_at DESC`
-        )
+        .query<RecipeVersionRow, [string]>(`SELECT * FROM recipe_versions WHERE recipe_id = ? ORDER BY created_at DESC`)
         .all(id)
 
     const detail: RecipeDetail = {
@@ -246,6 +250,7 @@ async function handleEditPreview(req: Request): Promise<Response> {
     if (!body.prompt) return error("prompt is required")
     if (!body.currentRecipe) return error("currentRecipe is required")
 
+    const prompt = body.prompt
     const parsed = RecipeSchema.safeParse(body.currentRecipe)
     if (!parsed.success) return error("currentRecipe is invalid")
 
@@ -258,7 +263,7 @@ async function handleEditPreview(req: Request): Promise<Response> {
                 controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(event)}\n\n`))
             }
             try {
-                await agentEditRecipe(parsed.data, history, body.prompt!, tags, send)
+                await agentEditRecipe(parsed.data, history, prompt, tags, send)
             } finally {
                 controller.close()
             }
@@ -304,7 +309,11 @@ async function handleCommitVersion(req: Request, recipeId: string): Promise<Resp
     let versionName: string | null = null
     if (body.editPrompt && body.originalRecipe) {
         try {
-            versionName = await generateVersionName(body.editPrompt, body.originalRecipe, parsed.data)
+            const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 8_000))
+            versionName = await Promise.race([
+                generateVersionName(body.editPrompt, body.originalRecipe, parsed.data),
+                timeout,
+            ])
         } catch {
             // Non-fatal: fall back to null name
         }
@@ -375,9 +384,7 @@ function handleDeleteRecipe(id: string): Response {
 // ─── Tag handlers ─────────────────────────────────────────────────────────────
 
 function handleGetTags(): Response {
-    const rows = db
-        .query<{ id: string; name: string }, []>(`SELECT id, name FROM tags ORDER BY name ASC`)
-        .all()
+    const rows = db.query<{ id: string; name: string }, []>(`SELECT id, name FROM tags ORDER BY name ASC`).all()
     return cors(json(rows))
 }
 
@@ -407,6 +414,7 @@ function handleDeleteTag(tagId: string): Response {
 
 Bun.serve({
     port: PORT,
+    idleTimeout: 120,
     async fetch(req) {
         const url = new URL(req.url)
         const { pathname } = url

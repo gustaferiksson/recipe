@@ -1,18 +1,14 @@
 import type { RecipeDetail } from "@recipe/recipe-core"
 import { Check, ChevronLeft, Loader2 } from "lucide-react"
-import { useEffect, useRef, useState } from "react"
+import { useRef, useState } from "react"
 import { Link, type LoaderFunctionArgs, useLoaderData, useNavigate, useParams } from "react-router-dom"
-import { type ConversationMessage, type EditAgentEvent, agentEditPreview, commitVersion, getRecipe } from "../api"
+import { agentEditPreview, type ConversationMessage, commitVersion, type EditAgentEvent, getRecipe } from "../api"
 
 export async function loader({ params }: LoaderFunctionArgs) {
     return getRecipe(params.id ?? "")
 }
 
-function RecipePane({
-    recipe,
-}: {
-    recipe: NonNullable<RecipeDetail["versions"][number]["recipe"]>
-}) {
+function RecipePane({ recipe }: { recipe: NonNullable<RecipeDetail["versions"][number]["recipe"]> }) {
     return (
         <div className="bg-base-200 rounded-box border border-base-300 p-4 space-y-4 text-sm overflow-y-auto">
             <div>
@@ -82,20 +78,24 @@ export function EditPage() {
 
     const diffBase = proposed ?? current
 
-    // Scroll chat thread to bottom when messages or hints change
-    useEffect(() => {
-        threadRef.current?.scrollTo({ top: threadRef.current.scrollHeight, behavior: "smooth" })
-    }, [messages, progressHints])
+    function scrollThreadToBottom() {
+        requestAnimationFrame(() => {
+            threadRef.current?.scrollTo({ top: threadRef.current.scrollHeight, behavior: "smooth" })
+        })
+    }
 
     function handleEvent(event: EditAgentEvent) {
         if (event.type === "progress") {
-            setProgressHints((prev) => [...prev, event.label])
+            setProgressHints([event.label])
+            scrollThreadToBottom()
         } else if (event.type === "clarification") {
             setMessages((prev) => [...prev, { role: "assistant", content: event.question }])
             setAwaitingClarification(true)
             setProgressHints([])
             setGenerating(false)
+            scrollThreadToBottom()
         } else if (event.type === "result") {
+            setMessages((prev) => [...prev, { role: "assistant", content: "Done." }])
             setProposed(event.recipe)
             setActiveTab("edited")
             setProgressHints([])
@@ -119,6 +119,7 @@ export function EditPage() {
         setError("")
         setProgressHints([])
         setAwaitingClarification(false)
+        scrollThreadToBottom()
 
         if (!usedPrompt) setUsedPrompt(trimmedPrompt)
 
@@ -158,7 +159,12 @@ export function EditPage() {
                 </Link>
                 <span className="flex-1 font-semibold text-sm truncate">Edit — {current.title}</span>
                 {proposed && (
-                    <button type="button" className="btn btn-primary btn-sm" onClick={() => void handleAccept()} disabled={committing}>
+                    <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        onClick={() => void handleAccept()}
+                        disabled={committing}
+                    >
                         {committing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                         Accept
                     </button>
@@ -199,15 +205,13 @@ export function EditPage() {
             <div className="sticky bottom-0 bg-base-100/90 backdrop-blur border-t border-base-300 px-4 py-4 space-y-3">
                 {/* Chat thread */}
                 {hasThread && (
-                    <div ref={threadRef} className="space-y-2 max-h-40 overflow-y-auto">
+                    <div ref={threadRef} className="max-h-40 overflow-y-auto">
                         {messages.map((msg, i) => (
                             // biome-ignore lint/suspicious/noArrayIndexKey: message order is stable
-                            <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                            <div key={i} className={`chat ${msg.role === "user" ? "chat-end" : "chat-start"}`}>
                                 <div
-                                    className={`text-xs px-3 py-1.5 rounded-2xl max-w-[85%] ${
-                                        msg.role === "user"
-                                            ? "bg-primary text-primary-content"
-                                            : "bg-base-300 text-base-content"
+                                    className={`chat-bubble chat-bubble-sm text-xs ${
+                                        msg.role === "user" ? "chat-bubble-primary" : ""
                                     }`}
                                 >
                                     {msg.content}
@@ -215,15 +219,10 @@ export function EditPage() {
                             </div>
                         ))}
                         {progressHints.length > 0 && (
-                            <div className="flex justify-start">
-                                <div className="text-xs px-3 py-1.5 rounded-2xl bg-base-300 text-base-content space-y-0.5">
-                                    {progressHints.map((hint, i) => (
-                                        // biome-ignore lint/suspicious/noArrayIndexKey: hints are append-only
-                                        <div key={i} className="flex items-center gap-1.5 opacity-70">
-                                            <Loader2 className="w-3 h-3 animate-spin shrink-0" />
-                                            {hint}
-                                        </div>
-                                    ))}
+                            <div className="chat chat-start">
+                                <div className="chat-bubble chat-bubble-sm text-xs flex items-center gap-1.5 opacity-70">
+                                    <Loader2 className="w-3 h-3 animate-spin shrink-0" />
+                                    {progressHints[0]}
                                 </div>
                             </div>
                         )}
@@ -250,8 +249,9 @@ export function EditPage() {
                         value={prompt}
                         onChange={(e) => setPrompt(e.target.value)}
                         disabled={generating}
-                        className="textarea textarea-bordered flex-1 resize-none text-sm"
-                        rows={2}
+                        className="textarea textarea-bordered flex-1 text-sm field-sizing-content"
+                        style={{ minHeight: 0 }}
+                        rows={1}
                         onKeyDown={(e) => {
                             if (e.key === "Enter" && !e.shiftKey) {
                                 e.preventDefault()
@@ -259,7 +259,11 @@ export function EditPage() {
                             }
                         }}
                     />
-                    <button type="submit" disabled={generating || !prompt.trim()} className="btn btn-primary self-end shrink-0">
+                    <button
+                        type="submit"
+                        disabled={generating || !prompt.trim()}
+                        className="btn btn-primary self-end shrink-0"
+                    >
                         {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : "Apply"}
                     </button>
                 </form>

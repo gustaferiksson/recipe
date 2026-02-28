@@ -13,13 +13,13 @@ export class RecipeStack extends cdk.Stack {
             userName: "recipe",
         })
 
-        // Bedrock policy: invoke Nova Pro and Nova Lite
+        // Bedrock policy: MiniMax M2.1 for the edit agent, Nova Lite for parsing and utility tasks
         user.addToPolicy(
             new iam.PolicyStatement({
                 effect: iam.Effect.ALLOW,
                 actions: ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
                 resources: [
-                    `arn:aws:bedrock:${region}::foundation-model/amazon.nova-pro-v1:0`,
+                    `arn:aws:bedrock:${region}::foundation-model/minimax.minimax-m2.1`,
                     `arn:aws:bedrock:${region}::foundation-model/amazon.nova-lite-v1:0`,
                 ],
             })
@@ -32,9 +32,7 @@ export class RecipeStack extends cdk.Stack {
         })
 
         new cdk.CfnOutput(this, "NextStep", {
-            value: `aws iam create-access-key --user-name recipe --profile ${
-                process.env.AWS_PROFILE ?? "default"
-            }`,
+            value: `aws iam create-access-key --user-name recipe --profile ${process.env.AWS_PROFILE ?? "default"}`,
             description: "Run this to generate access keys for the user",
         })
     }

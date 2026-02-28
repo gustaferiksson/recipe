@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "build": "tsc && cdk synth",
-    "deploy": "cdk deploy --profile ${AWS_PROFILE:-default} --region ${AWS_REGION:-eu-west-1}",
-    "diff": "cdk diff --profile ${AWS_PROFILE:-default} --region ${AWS_REGION:-eu-west-1}",
+    "deploy": "cdk deploy",
+    "diff": "cdk diff",
     "synth": "cdk synth",
     "typecheck": "tsc --noEmit"
   },

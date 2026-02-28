@@ -67,7 +67,11 @@ export function SettingsPage() {
                         disabled={adding}
                         className="input input-bordered flex-1 text-sm"
                     />
-                    <button type="submit" disabled={adding || !input.trim()} className="btn btn-primary btn-sm self-end">
+                    <button
+                        type="submit"
+                        disabled={adding || !input.trim()}
+                        className="btn btn-primary btn-sm self-end"
+                    >
                         Add
                     </button>
                 </form>

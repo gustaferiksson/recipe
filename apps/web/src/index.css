@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @plugin "daisyui" {
-  themes: retro --default, luxury --prefersdark;
+  themes:
+    retro --default,
+    luxury --prefersdark;
 }
 
 /* luxury dark: plain text white, NOT headings or explicit markers */

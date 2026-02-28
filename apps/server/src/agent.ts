@@ -1,5 +1,5 @@
 import { createAmazonBedrock } from "@ai-sdk/amazon-bedrock"
-import { type Recipe, RecipeSchema, IngredientSchema } from "@recipe/recipe-core"
+import { IngredientSchema, type Recipe, RecipeSchema } from "@recipe/recipe-core"
 import { generateObject, generateText, stepCountIs, tool } from "ai"
 import { z } from "zod"
 
@@ -9,7 +9,8 @@ const bedrock = createAmazonBedrock({
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
 })
 
-const model = bedrock("amazon.nova-pro-v1:0")
+const agentModel = bedrock("minimax.minimax-m2.1")
+const utilityModel = bedrock("amazon.nova-lite-v1:0")
 
 // Omit server-managed fields so the AI doesn't have to generate valid URLs/datetimes
 const AIRecipeSchema = RecipeSchema.omit({ scrapedAt: true, sourceUrl: true })
@@ -35,15 +36,17 @@ export async function parseRecipeFromMarkdown(
 ): Promise<Recipe> {
     const tagInstruction = buildTagInstruction(tags)
     const { object } = await generateObject({
-        model,
+        model: utilityModel,
         schema: AIRecipeSchema,
         prompt: `Extract the recipe from the following web page content. The source URL is ${sourceUrl}.
 
 Return all fields you can find:
+- Extract ingredients ONLY from the ingredients list/section — never pull ingredients mentioned inside preparation steps
 - Parse ingredient quantity and unit when possible
 - Return each step as a separate string in order
 - Set cuisine to the culinary tradition (e.g. Italian, Thai, Mexican)
-- Set category to the meal type (e.g. Main Course, Dessert, Appetizer, Breakfast, Bread)${tagInstruction ? `\n- ${tagInstruction.slice(2)}` : ""}
+- Set category to the meal type (e.g. Main Course, Dessert, Appetizer, Breakfast, Bread)
+- Keep all text in the original language of the page — do not translate anything${tagInstruction ? `\n- ${tagInstruction.slice(2)}` : ""}
 
 Page content:
 ${markdown}`,
@@ -61,11 +64,12 @@ export async function agentEditRecipe(
 ): Promise<void> {
     const tagInstruction = buildTagInstruction(tags)
     const abortController = new AbortController()
-    const timeoutId = setTimeout(() => abortController.abort("timeout"), 10_000)
+    const timeoutId = setTimeout(() => abortController.abort("timeout"), 60_000)
 
     let clarificationQuestion: string | null = null
     let finalRecipe: Recipe = { ...currentRecipe }
     let recipeMutated = false
+    let resultEmitted = false
 
     const systemPrompt = `You are a recipe editor. Modify the recipe based on the user's request using the provided tools.
 
@@ -75,11 +79,12 @@ ${JSON.stringify(currentRecipe, null, 2)}
 Rules:
 - When adding, removing, or changing an ingredient, you MUST call both update_ingredients AND update_steps
 - Always call review_recipe as your final action with the complete modified recipe
-- Call ask_clarification ONLY if the request is completely unintelligible — if you can make a reasonable assumption, proceed without asking${tagInstruction ? `\n- ${tagInstruction}` : ""}`
+- Call ask_clarification ONLY if the request is completely unintelligible — if you can make a reasonable assumption, proceed without asking
+- Protein (meat, poultry, fish, seafood) MUST always be cooked separately and added at the correct step — never combined raw with other ingredients${tagInstruction ? `\n- ${tagInstruction}` : ""}`
 
     try {
         await generateText({
-            model,
+            model: agentModel,
             stopWhen: stepCountIs(5),
             abortSignal: abortController.signal,
             system: systemPrompt,
@@ -150,9 +155,16 @@ Rules:
                         recipe: AIRecipeSchema,
                     }),
                     execute: async ({ recipe }) => {
-                        finalRecipe = { ...recipe, sourceUrl: currentRecipe.sourceUrl, scrapedAt: currentRecipe.scrapedAt }
+                        finalRecipe = {
+                            ...recipe,
+                            sourceUrl: currentRecipe.sourceUrl,
+                            scrapedAt: currentRecipe.scrapedAt,
+                        }
                         recipeMutated = true
                         onEvent({ type: "progress", label: "Reviewing consistency..." })
+                        onEvent({ type: "result", recipe: finalRecipe })
+                        resultEmitted = true
+                        abortController.abort("done")
                         return "Recipe finalized"
                     },
                 }),
@@ -166,6 +178,8 @@ Rules:
 
     if (clarificationQuestion) {
         onEvent({ type: "clarification", question: clarificationQuestion })
+    } else if (resultEmitted) {
+        // Result already emitted inside review_recipe tool
     } else if (abortController.signal.aborted && abortController.signal.reason === "timeout") {
         onEvent({ type: "error", message: "Edit timed out. Please try a simpler request." })
     } else if (!recipeMutated) {
@@ -181,7 +195,7 @@ export async function generateVersionName(
     editedRecipe: Recipe
 ): Promise<string> {
     const { text } = await generateText({
-        model,
+        model: utilityModel,
         prompt: `Given this edit instruction and what changed in the recipe, return a short (2-5 word) title describing the version. No quotes.
 Examples: Vegetarian Adaptation, Halved Servings, Gluten-Free Version
 
