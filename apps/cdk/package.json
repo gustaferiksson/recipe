@@ -1,0 +1,21 @@
+{
+  "name": "@recipe/cdk",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "build": "tsc && cdk synth",
+    "deploy": "cdk deploy --profile ${AWS_PROFILE:-default} --region ${AWS_REGION:-eu-west-1}",
+    "diff": "cdk diff --profile ${AWS_PROFILE:-default} --region ${AWS_REGION:-eu-west-1}",
+    "synth": "cdk synth",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.240.0",
+    "constructs": "^10.5.1"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "aws-cdk": "^2.1108.0",
+    "typescript": "~5.9.3"
+  }
+}

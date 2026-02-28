@@ -1,0 +1,69 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.3.8/schema.json",
+  "assist": { "actions": { "source": { "organizeImports": "on" } } },
+  "files": {
+    "includes": [
+      "**",
+      "!**/dist",
+      "!**/cdk.out",
+      "!**/build",
+      "!**/node_modules",
+      "!**/package*.json"
+    ]
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "style": {
+        "noNonNullAssertion": "warn",
+        "noRestrictedImports": {
+          "level": "error",
+          "options": {
+            "paths": {
+              "module": "You probably meant to use our Module type instead.",
+              "node:module": "You probably meant to use our Module type instead."
+            }
+          }
+        }
+      },
+      "correctness": {
+        "noUnusedVariables": {
+          "level": "error",
+          "options": { "ignoreRestSiblings": true }
+        },
+        "noUnusedImports": "error"
+      },
+      "nursery": {
+        "noFloatingPromises": "error",
+        "noMisusedPromises": "error",
+        "noImportCycles": "warn"
+      }
+    }
+  },
+  "json": {
+    "formatter": {
+      "indentWidth": 2,
+      "indentStyle": "space"
+    }
+  },
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
+    },
+    "formatter": {
+      "indentStyle": "space",
+      "indentWidth": 2
+    }
+  },
+  "javascript": {
+    "formatter": {
+      "semicolons": "asNeeded",
+      "quoteStyle": "double",
+      "indentStyle": "space",
+      "trailingCommas": "es5",
+      "indentWidth": 4,
+      "lineWidth": 120
+    }
+  }
+}

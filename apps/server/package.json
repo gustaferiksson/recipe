@@ -1,0 +1,28 @@
+{
+  "name": "@recipe/server",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "start": "bun run src/index.ts",
+    "reset-db": "bun run src/reset-db.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ai-sdk/amazon-bedrock": "^4.0.69",
+    "@mozilla/readability": "^0.6.0",
+    "@recipe/recipe-core": "workspace:*",
+    "ai": "^6.0.105",
+    "jsdom": "^28.1.0",
+    "node-thermal-printer": "^4.6.0",
+    "turndown": "^7.2.2",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/jsdom": "^28.0.0",
+    "@types/mozilla__readability": "^0.4.2",
+    "@types/turndown": "^5.0.6",
+    "bun-types": "latest",
+    "typescript": "~5.9.3"
+  }
+}
