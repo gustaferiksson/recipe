@@ -1,9 +1,7 @@
 import type { RecipeDetail } from "@recipe/recipe-core"
-import { Check, ChevronLeft, Pencil, Printer, Star, UtensilsCrossed } from "lucide-react"
+import { Check, ChevronLeft, Pencil, Printer, Star } from "lucide-react"
 import { useState } from "react"
 import { Link, type LoaderFunctionArgs, useLoaderData, useNavigate, useParams } from "react-router-dom"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { getRecipe, printRecipe, setDefault } from "../api"
 
 export async function loader({ params }: LoaderFunctionArgs) {
@@ -48,7 +46,7 @@ export function RecipeDetailPage() {
     if (!recipe) {
         return (
             <div className="min-h-dvh flex items-center justify-center">
-                <p className="text-muted-foreground text-sm">Recipe not found.</p>
+                <p className="text-sm opacity-60">Recipe not found.</p>
             </div>
         )
     }
@@ -58,32 +56,24 @@ export function RecipeDetailPage() {
     return (
         <div className="min-h-dvh max-w-lg mx-auto pb-10">
             {/* Top bar */}
-            <div className="sticky top-0 z-10 bg-background/90 backdrop-blur border-b border-border px-4 py-3 flex items-center gap-2">
-                <Button variant="ghost" size="icon" asChild>
-                    <Link to="/recipes">
-                        <ChevronLeft className="w-5 h-5" />
-                    </Link>
-                </Button>
+            <div className="sticky top-0 z-10 bg-base-100/90 backdrop-blur border-b border-base-300 px-4 py-3 flex items-center gap-2">
+                <Link to="/recipes" className="btn btn-ghost btn-square">
+                    <ChevronLeft className="w-5 h-5" />
+                </Link>
                 <span className="flex-1 font-semibold truncate text-sm">{recipe.title}</span>
-                <Button variant="ghost" size="icon" onClick={() => void navigate(`/recipes/${id}/edit`)}>
+                <button type="button" className="btn btn-ghost btn-square" onClick={() => void navigate(`/recipes/${id}/edit`)}>
                     <Pencil className="w-4 h-4" />
-                </Button>
-                <Button size="icon" onClick={handlePrint} disabled={printing} title="Print recipe">
+                </button>
+                <button type="button" className="btn btn-primary btn-square" onClick={handlePrint} disabled={printing} title="Print recipe">
                     <Printer className="w-4 h-4" />
-                </Button>
+                </button>
             </div>
 
             {/* Print feedback */}
             {printMsg && (
-                <div
-                    className={`mx-4 mt-3 px-4 py-2 rounded-[--radius] text-sm flex items-center gap-2 ${
-                        printMsg.type === "success"
-                            ? "bg-primary/15 text-primary"
-                            : "bg-destructive/15 text-destructive"
-                    }`}
-                >
+                <div role="alert" className={`alert ${printMsg.type === "success" ? "alert-success" : "alert-error"} mx-4 mt-3`}>
                     {printMsg.type === "success" && <Check className="w-4 h-4" />}
-                    {printMsg.text}
+                    <span>{printMsg.text}</span>
                 </div>
             )}
 
@@ -91,8 +81,8 @@ export function RecipeDetailPage() {
             {imageSrc ? (
                 <img src={imageSrc} alt={recipe.title} className="w-full aspect-video object-cover" />
             ) : (
-                <div className="w-full aspect-video bg-muted flex items-center justify-center">
-                    <UtensilsCrossed className="w-12 h-12 text-muted-foreground/30" />
+                <div className="w-full aspect-video bg-base-200 flex items-center justify-center">
+                    <span className="text-6xl opacity-30">🍳</span>
                 </div>
             )}
 
@@ -100,7 +90,7 @@ export function RecipeDetailPage() {
                 {/* Title + meta */}
                 <div>
                     <h1 className="text-2xl font-bold leading-tight">{recipe.title}</h1>
-                    <div className="flex flex-wrap gap-3 mt-2 text-sm text-muted-foreground">
+                    <div className="flex flex-wrap gap-3 mt-2 text-sm opacity-60">
                         {recipe.servings && <span>Serves {recipe.servings}</span>}
                         {recipe.prepTime && <span>Prep {recipe.prepTime}m</span>}
                         {recipe.cookTime && <span>Cook {recipe.cookTime}m</span>}
@@ -109,9 +99,7 @@ export function RecipeDetailPage() {
                     {recipe.tags && recipe.tags.length > 0 && (
                         <div className="flex gap-2 mt-3 flex-wrap">
                             {recipe.tags.map((t) => (
-                                <Badge key={t} variant="secondary">
-                                    {t}
-                                </Badge>
+                                <span key={t} className="badge badge-neutral">{t}</span>
                             ))}
                         </div>
                     )}
@@ -123,7 +111,7 @@ export function RecipeDetailPage() {
                     <ul className="space-y-2">
                         {recipe.ingredients.map((ing, i) => (
                             <li key={ing.name} className="flex gap-2 text-sm">
-                                <span className="text-muted-foreground w-4 shrink-0">{i + 1}.</span>
+                                <span className="opacity-50 w-4 shrink-0">{i + 1}.</span>
                                 <span>
                                     {[
                                         ing.quantity != null ? String(ing.quantity) : null,
@@ -163,13 +151,13 @@ export function RecipeDetailPage() {
                                 return (
                                     <li
                                         key={v.id}
-                                        className={`flex items-center gap-3 p-3 rounded-[--radius] border text-sm transition-colors ${
-                                            isDefault ? "border-primary/40 bg-primary/5" : "border-border"
+                                        className={`flex items-center gap-3 p-3 rounded-box border text-sm transition-colors ${
+                                            isDefault ? "border-primary/40 bg-primary/5" : "border-base-300"
                                         }`}
                                     >
                                         <div className="flex-1 min-w-0">
                                             <p className="font-medium truncate">{v.editPrompt ?? "Original"}</p>
-                                            <p className="text-xs text-muted-foreground mt-0.5">
+                                            <p className="text-xs opacity-50 mt-0.5">
                                                 {new Date(v.createdAt).toLocaleDateString()}
                                             </p>
                                         </div>
@@ -178,14 +166,13 @@ export function RecipeDetailPage() {
                                                 <Star className="w-3 h-3" /> Default
                                             </span>
                                         ) : (
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
+                                            <button
+                                                type="button"
+                                                className="btn btn-ghost btn-xs opacity-60"
                                                 onClick={() => void handleSetDefault(v.id)}
-                                                className="text-xs text-muted-foreground"
                                             >
                                                 Set default
-                                            </Button>
+                                            </button>
                                         )}
                                     </li>
                                 )
@@ -198,7 +185,7 @@ export function RecipeDetailPage() {
                     href={recipe.sourceUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-xs text-muted-foreground hover:text-foreground transition-colors block"
+                    className="link link-hover text-xs opacity-50 block"
                 >
                     View original source ↗
                 </a>

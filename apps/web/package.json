@@ -11,16 +11,11 @@
   },
   "dependencies": {
     "@recipe/recipe-core": "workspace:*",
-    "@radix-ui/react-dialog": "latest",
-    "@radix-ui/react-slot": "latest",
-    "@radix-ui/react-toast": "latest",
-    "class-variance-authority": "latest",
-    "clsx": "latest",
+    "daisyui": "latest",
     "lucide-react": "latest",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
-    "react-router-dom": "^7.13.1",
-    "tailwind-merge": "latest"
+    "react-router-dom": "^7.13.1"
   },
   "devDependencies": {
     "@tailwindcss/vite": "latest",

@@ -1,8 +1,6 @@
-import { Loader2, UtensilsCrossed } from "lucide-react"
+import { Loader2 } from "lucide-react"
 import { useRef, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { type ImportEvent, importRecipe } from "../api"
 
 type Phase = "idle" | "scraping" | "parsing" | "error"
@@ -44,53 +42,47 @@ export function ImportPage() {
         <div className="min-h-dvh flex flex-col px-6 py-8 max-w-lg mx-auto">
             <div className="flex items-baseline justify-between mb-12">
                 <div className="flex items-center gap-2">
-                    <UtensilsCrossed className="text-primary w-5 h-5" />
-                    <h1 className="text-2xl font-bold text-primary">Recipe Printer</h1>
+                    <span className="text-2xl">🍳</span>
+                    <h1 className="text-2xl font-bold text-primary">Recipes</h1>
                 </div>
-                <Link to="/recipes" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                <Link to="/recipes" className="link link-hover text-sm">
                     My Recipes →
                 </Link>
             </div>
 
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-                <label htmlFor="url" className="text-sm text-muted-foreground">
+                <label htmlFor="url" className="label">
                     Paste a recipe URL
                 </label>
-                <Input
+                <input
                     id="url"
                     type="url"
                     placeholder="https://..."
                     value={url}
                     onChange={(e) => setUrl(e.target.value)}
                     disabled={isLoading}
-                    autoFocus
                     inputMode="url"
-                    className="text-base"
+                    className="input input-bordered w-full text-base"
                 />
-                <Button type="submit" disabled={isLoading || !url.trim()} size="lg">
+                <button type="submit" disabled={isLoading || !url.trim()} className="btn btn-primary btn-lg">
                     {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
                     Import Recipe
-                </Button>
+                </button>
             </form>
 
             {isLoading && (
-                <div className="mt-10 flex flex-col items-center gap-3 text-muted-foreground">
+                <div className="mt-10 flex flex-col items-center gap-3 opacity-60">
                     <Loader2 className="w-8 h-8 animate-spin text-primary" />
                     <p className="text-sm">{statusLabel[phase as "scraping" | "parsing"]}</p>
                 </div>
             )}
 
             {phase === "error" && (
-                <div className="mt-8 p-4 rounded-[--radius] border border-destructive/40 bg-destructive/10 text-destructive text-sm flex flex-col gap-3">
+                <div role="alert" className="alert alert-error mt-8 flex flex-col items-start gap-3">
                     <p>{errorMsg}</p>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        className="self-start border-destructive/40 text-destructive hover:bg-destructive/10"
-                        onClick={() => setPhase("idle")}
-                    >
+                    <button type="button" className="btn btn-sm btn-outline" onClick={() => setPhase("idle")}>
                         Try again
-                    </Button>
+                    </button>
                 </div>
             )}
         </div>
