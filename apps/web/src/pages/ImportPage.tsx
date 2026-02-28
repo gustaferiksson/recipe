@@ -1,4 +1,4 @@
-import { Loader2, UtensilsCrossed } from "lucide-react"
+import { Loader2, Settings, UtensilsCrossed } from "lucide-react"
 import { useRef, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { Button } from "@/components/ui/button"
@@ -47,9 +47,16 @@ export function ImportPage() {
                     <UtensilsCrossed className="text-primary w-5 h-5" />
                     <h1 className="text-2xl font-bold text-primary">Recipe Printer</h1>
                 </div>
-                <Link to="/recipes" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                    My Recipes →
-                </Link>
+                <div className="flex items-center gap-3">
+                    <Link to="/recipes" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                        My Recipes →
+                    </Link>
+                    <Button variant="ghost" size="icon" asChild className="text-muted-foreground">
+                        <Link to="/settings" aria-label="Settings">
+                            <Settings className="w-4 h-4" />
+                        </Link>
+                    </Button>
+                </div>
             </div>
 
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">

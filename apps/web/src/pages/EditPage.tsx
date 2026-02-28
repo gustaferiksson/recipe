@@ -73,6 +73,7 @@ export function EditPage() {
     const current = (detail.versions.find((v) => v.id === detail.defaultVersionId) ?? detail.versions.at(-1))?.recipe
 
     const [prompt, setPrompt] = useState("")
+    const [usedPrompt, setUsedPrompt] = useState("")
     const [proposed, setProposed] = useState<NonNullable<typeof current> | null>(null)
     const [generating, setGenerating] = useState(false)
     const [committing, setCommitting] = useState(false)
@@ -84,11 +85,13 @@ export function EditPage() {
     async function handleGenerate() {
         if (!prompt.trim() || !diffBase || !id) return
 
+        const trimmedPrompt = prompt.trim()
         setGenerating(true)
         setError("")
         try {
-            const result = await editPreview(id, prompt.trim(), diffBase)
+            const result = await editPreview(id, trimmedPrompt, diffBase)
             setProposed(result)
+            setUsedPrompt(trimmedPrompt)
             setPrompt("")
         } catch (err) {
             setError(err instanceof Error ? err.message : "Something went wrong")
@@ -101,7 +104,7 @@ export function EditPage() {
         if (!proposed || !id) return
         setCommitting(true)
         try {
-            await commitVersion(id, proposed, prompt || "AI edit")
+            await commitVersion(id, proposed, usedPrompt || "AI edit", detail.originalRecipe)
             void navigate(`/recipes/${id}`)
         } catch {
             setError("Failed to save version")

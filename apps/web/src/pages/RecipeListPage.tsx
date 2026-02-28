@@ -1,5 +1,5 @@
 import type { RecipeListItem } from "@recipe/recipe-core"
-import { ChevronLeft, Trash2, UtensilsCrossed } from "lucide-react"
+import { ChevronLeft, Settings, Trash2, UtensilsCrossed } from "lucide-react"
 import { useState } from "react"
 import { Link, useLoaderData, useNavigate } from "react-router-dom"
 import { Badge } from "@/components/ui/badge"
@@ -30,7 +30,12 @@ export function RecipeListPage() {
                         <ChevronLeft className="w-5 h-5" />
                     </Link>
                 </Button>
-                <h1 className="text-xl font-bold">My Recipes</h1>
+                <h1 className="text-xl font-bold flex-1">My Recipes</h1>
+                <Button variant="ghost" size="icon" asChild className="text-muted-foreground">
+                    <Link to="/settings" aria-label="Settings">
+                        <Settings className="w-4 h-4" />
+                    </Link>
+                </Button>
             </div>
 
             {recipes.length === 0 && (

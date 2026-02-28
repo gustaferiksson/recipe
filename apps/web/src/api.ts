@@ -74,12 +74,13 @@ export async function editPreview(recipeId: string, prompt: string, currentRecip
 export async function commitVersion(
     recipeId: string,
     recipe: Recipe,
-    editPrompt: string
+    editPrompt: string,
+    originalRecipe?: Recipe
 ): Promise<{ versionId: string }> {
     const res = await fetch(`/api/recipes/${recipeId}/versions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ recipe, editPrompt }),
+        body: JSON.stringify({ recipe, editPrompt, originalRecipe }),
     })
     if (!res.ok) throw new Error("Failed to commit version")
     return res.json()
@@ -104,4 +105,25 @@ export async function printRecipe(recipeId: string): Promise<void> {
 export async function deleteRecipe(recipeId: string): Promise<void> {
     const res = await fetch(`/api/recipes/${recipeId}`, { method: "DELETE" })
     if (!res.ok) throw new Error("Failed to delete recipe")
+}
+
+export async function getTags(): Promise<{ id: string; name: string }[]> {
+    const res = await fetch("/api/tags")
+    if (!res.ok) throw new Error("Failed to fetch tags")
+    return res.json()
+}
+
+export async function createTag(name: string): Promise<{ id: string; name: string }> {
+    const res = await fetch("/api/tags", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+    })
+    if (!res.ok) throw new Error("Failed to create tag")
+    return res.json()
+}
+
+export async function deleteTag(id: string): Promise<void> {
+    const res = await fetch(`/api/tags/${id}`, { method: "DELETE" })
+    if (!res.ok) throw new Error("Failed to delete tag")
 }

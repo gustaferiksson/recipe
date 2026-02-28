@@ -24,6 +24,11 @@ export const RecipeSchema = z.object({
 export type Ingredient = z.infer<typeof IngredientSchema>
 export type Recipe = z.infer<typeof RecipeSchema>
 
+export type IngredientDiff =
+    | { type: "added"; ingredient: Ingredient }
+    | { type: "removed"; ingredient: Ingredient }
+    | { type: "modified"; before: Ingredient; after: Ingredient }
+
 // DB row shapes (what the server reads/writes to SQLite)
 export interface RecipeRow {
     id: string
@@ -40,6 +45,8 @@ export interface RecipeVersionRow {
     recipe_id: string
     recipe_json: string
     edit_prompt: string | null
+    name: string | null
+    changeset: string | null
     created_at: string
 }
 
@@ -65,6 +72,8 @@ export interface RecipeDetail {
         id: string
         recipe: Recipe
         editPrompt: string | null
+        name: string | null
+        changeset: IngredientDiff[] | null
         createdAt: string
     }>
 }
